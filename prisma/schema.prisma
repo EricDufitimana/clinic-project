@@ -1,0 +1,77 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id         String   @id @default(uuid())
+  user_id    String   @unique // Supabase Auth user ID
+  email      String
+  first_name String
+  last_name  String
+  role       UserRole
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  // medicalDescriptions MedicalDescription[] // Not used - using Supabase client
+
+  @@index([user_id])
+  @@index([email])
+  @@map("users")
+}
+
+model Patient {
+  id              String        @id @default(cuid())
+  name            String
+  contact         String        @unique
+  status          PatientStatus @default(ACTIVE)
+  condition       String
+  lastVisit       DateTime      @map("last_visit")
+  nextAppointment DateTime?     @map("next_appointment")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  // medicalDescriptions MedicalDescription[] // Not used - using Supabase client
+
+  @@map("patients")
+}
+
+enum UserRole {
+  doctor
+  nurse
+}
+
+enum PatientStatus {
+  ACTIVE
+  INACTIVE
+  CRITICAL
+}
+
+// Note: MedicalDescription model is not used - we use Supabase client directly
+// The table is created via SQL migration: create_medical_descriptions_table.sql
+// 
+// model MedicalDescription {
+//   id          String   @id @default(cuid())
+//   patient_id  String
+//   doctor_id  String
+//   description String
+//   diagnosis   String?
+//   notes       String?
+//   created_at  DateTime @default(now()) @map("created_at")
+//   updated_at  DateTime @updatedAt @map("updated_at")
+//
+//   patient Patient @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+//   doctor  User    @relation(fields: [doctor_id], references: [id], onDelete: Cascade)
+//
+//   @@index([patient_id])
+//   @@index([doctor_id])
+//   @@map("medical_descriptions")
+// }
