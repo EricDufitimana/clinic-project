@@ -4,11 +4,12 @@ import { getAuthenticatedUser } from '@/utils/auth/get-authenticated-user'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     console.log('🔄 PATCH /api/lab-requests/[id] - Update lab request started');
-    console.log('📋 Request ID:', params.id);
+    console.log('📋 Request ID:', id);
     
     // Get authenticated user
     console.log('🔐 Fetching authenticated user...');
@@ -59,7 +60,7 @@ export async function PATCH(
     const { data: labRequest, error: fetchError } = await supabase
       .from('lab_requests')
       .select('id, doctor_id, status')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (fetchError || !labRequest) {
@@ -95,7 +96,7 @@ export async function PATCH(
         result: testResult,
         status: status,
       })
-      .eq('id', params.id)
+      .eq('id', id)
       .select()
       .single()
 

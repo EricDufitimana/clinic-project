@@ -28,6 +28,8 @@ import {
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { ViewLabResultDialog } from '@/components/diagnostics/view-lab-result-dialog'
 import { toast } from 'sonner'
 import {
   Select,
@@ -69,6 +71,8 @@ export function DiagnosticsTable() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed'>('all')
   const [selectedRequest, setSelectedRequest] = useState<LabRequest | null>(null)
   const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false)
+  const [selectedResultRequest, setSelectedResultRequest] = useState<LabRequest | null>(null)
+  const [isViewResultDialogOpen, setIsViewResultDialogOpen] = useState(false)
 
   const fetchLabRequests = async () => {
     try {
@@ -100,6 +104,11 @@ export function DiagnosticsTable() {
 
   const handleResultSuccess = () => {
     fetchLabRequests() // Refresh the list
+  }
+
+  const handleViewResults = (request: LabRequest) => {
+    setSelectedResultRequest(request)
+    setIsViewResultDialogOpen(true)
   }
 
   // Filter requests based on user role
@@ -182,7 +191,7 @@ export function DiagnosticsTable() {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="overflow-x-auto">
+      <CardContent>
         {filteredRequests.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             {searchQuery || statusFilter !== 'all' 
@@ -190,111 +199,113 @@ export function DiagnosticsTable() {
               : 'No lab requests yet.'}
           </div>
         ) : (
-          <div className="min-w-full overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-[150px]">Test Type</TableHead>
-                  <TableHead className="min-w-[180px]">Patient</TableHead>
-                  <TableHead className="min-w-[150px]">Requested By</TableHead>
-                  <TableHead className="min-w-[150px]">Assigned Doctor</TableHead>
-                  <TableHead className="min-w-[120px]">Status</TableHead>
-                  <TableHead className="min-w-[200px]">Reason</TableHead>
-                  <TableHead className="min-w-[150px]">Requested On</TableHead>
-                  <TableHead className="text-right min-w-[100px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRequests.map((request) => (
-                  <TableRow key={request.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                          <TestTube2 className="h-4 w-4 text-primary" />
-                        </div>
-                        <div>
-                          <div className="font-medium whitespace-nowrap">{request.test_type}</div>
-                          <div className="text-xs text-muted-foreground whitespace-nowrap">
-                            ID: {request.id.slice(0, 8)}
-                          </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium whitespace-nowrap">
-                          {request.patient?.full_name || 'Unknown Patient'}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {request.patient?.age ? `${request.patient.age} years old` : 'N/A'}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm whitespace-nowrap">
-                        {request.nurse 
-                          ? `${request.nurse.first_name} ${request.nurse.last_name}`
-                          : 'Unknown Nurse'
-                        }
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm whitespace-nowrap font-medium">
-                        {request.doctor 
-                          ? `Dr. ${request.doctor.first_name} ${request.doctor.last_name}`
-                          : 'Unassigned'
-                        }
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {getStatusBadge(request.status)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm max-w-[200px]">
-                        {request.reason ? (
-                          <div className="truncate" title={request.reason}>
-                            {request.reason}
-                          </div>
-                        ) : (
-                          <div className="text-muted-foreground">No reason provided</div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm whitespace-nowrap">
-                      {formatDate(request.created_at)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {request.status === 'completed' ? (
-                            <DropdownMenuItem>
-                              <FileText className="h-4 w-4 mr-2" />
-                              View Results
-                            </DropdownMenuItem>
-                          ) : user?.role === 'doctor' ? (
-                            <DropdownMenuItem onClick={() => handleSubmitResult(request)}>
-                              <TestTube2 className="h-4 w-4 mr-2" />
-                              Submit Result
-                            </DropdownMenuItem>
-                          ) : (
-                            <>
-                              <DropdownMenuItem>Edit Request</DropdownMenuItem>
-                              <DropdownMenuItem className="text-red-600">Delete Request</DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+          <ScrollArea className="w-full">
+            <div className="min-w-full">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="min-w-[150px]">Test Type</TableHead>
+                    <TableHead className="min-w-[180px]">Patient</TableHead>
+                    <TableHead className="min-w-[150px]">Requested By</TableHead>
+                    <TableHead className="min-w-[150px]">Assigned Doctor</TableHead>
+                    <TableHead className="min-w-[120px]">Status</TableHead>
+                    <TableHead className="min-w-[200px]">Reason</TableHead>
+                    <TableHead className="min-w-[150px]">Requested On</TableHead>
+                    <TableHead className="text-right min-w-[100px]">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {filteredRequests.map((request) => (
+                    <TableRow key={request.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div className="p-2 rounded-lg bg-primary/10">
+                            <TestTube2 className="h-4 w-4 text-primary" />
+                          </div>
+                          <div>
+                            <div className="font-medium whitespace-nowrap">{request.test_type}</div>
+                            <div className="text-xs text-muted-foreground whitespace-nowrap">
+                              ID: {request.id.slice(0, 8)}
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium whitespace-nowrap">
+                            {request.patient?.full_name || 'Unknown Patient'}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {request.patient?.age ? `${request.patient.age} years old` : 'N/A'}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm whitespace-nowrap">
+                          {request.nurse 
+                            ? `${request.nurse.first_name} ${request.nurse.last_name}`
+                            : 'Unknown Nurse'
+                          }
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm whitespace-nowrap font-medium">
+                          {request.doctor 
+                            ? `Dr. ${request.doctor.first_name} ${request.doctor.last_name}`
+                            : 'Unassigned'
+                          }
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {getStatusBadge(request.status)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm max-w-[200px]">
+                          {request.reason ? (
+                            <div className="truncate" title={request.reason}>
+                              {request.reason}
+                            </div>
+                          ) : (
+                            <div className="text-muted-foreground">No reason provided</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm whitespace-nowrap">
+                        {formatDate(request.created_at)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {request.status === 'completed' ? (
+                              <DropdownMenuItem onClick={() => handleViewResults(request)}>
+                                <FileText className="h-4 w-4 mr-2" />
+                                View Results
+                              </DropdownMenuItem>
+                            ) : user?.role === 'doctor' ? (
+                              <DropdownMenuItem onClick={() => handleSubmitResult(request)}>
+                                <TestTube2 className="h-4 w-4 mr-2" />
+                                Submit Result
+                              </DropdownMenuItem>
+                            ) : (
+                              <>
+                                <DropdownMenuItem>Edit Request</DropdownMenuItem>
+                                <DropdownMenuItem className="text-red-600">Delete Request</DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </ScrollArea>
         )}
       </CardContent>
 
@@ -304,6 +315,14 @@ export function DiagnosticsTable() {
           onOpenChange={setIsSubmitDialogOpen}
           labRequest={selectedRequest}
           onSuccess={handleResultSuccess}
+        />
+      )}
+
+      {selectedResultRequest && (
+        <ViewLabResultDialog
+          open={isViewResultDialogOpen}
+          onOpenChange={setIsViewResultDialogOpen}
+          labRequest={selectedResultRequest}
         />
       )}
     </Card>

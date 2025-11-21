@@ -27,7 +27,9 @@ import {
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { toast } from 'sonner'
+import { ViewDiagnosticDialog } from '@/components/diagnostics/view-diagnostic-dialog'
 import {
   Select,
   SelectContent,
@@ -42,6 +44,7 @@ interface MedicalDescription {
   doctor_id: string
   description: string
   notes: string | null
+  prescriptions: any[] | null
   created_at: string
   patient?: {
     id: string
@@ -61,6 +64,8 @@ export function MedicalDescriptionsTable() {
   const [medicalDescriptions, setMedicalDescriptions] = useState<MedicalDescription[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedDescription, setSelectedDescription] = useState<MedicalDescription | null>(null)
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
 
   const fetchMedicalDescriptions = async () => {
     try {
@@ -105,6 +110,11 @@ export function MedicalDescriptionsTable() {
     })
   }
 
+  const handleViewDetails = (description: MedicalDescription) => {
+    setSelectedDescription(description)
+    setIsViewDialogOpen(true)
+  }
+
   if (loading) {
     return (
       <Card className="shadow-none w-full">
@@ -139,7 +149,7 @@ export function MedicalDescriptionsTable() {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="overflow-x-auto">
+      <CardContent>
         {filteredDescriptions.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             {searchQuery 
@@ -147,8 +157,9 @@ export function MedicalDescriptionsTable() {
               : 'No medical descriptions yet.'}
           </div>
         ) : (
-          <div className="min-w-full overflow-x-auto">
-            <Table>
+          <ScrollArea className="w-full">
+            <div className="min-w-full">
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="min-w-[180px]">Patient</TableHead>
@@ -197,7 +208,7 @@ export function MedicalDescriptionsTable() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewDetails(description)}>
                             <FileText className="h-4 w-4 mr-2" />
                             View Details
                           </DropdownMenuItem>
@@ -208,9 +219,18 @@ export function MedicalDescriptionsTable() {
                 ))}
               </TableBody>
             </Table>
-          </div>
+            </div>
+          </ScrollArea>
         )}
       </CardContent>
+
+      {selectedDescription && (
+        <ViewDiagnosticDialog
+          open={isViewDialogOpen}
+          onOpenChange={setIsViewDialogOpen}
+          medicalDescription={selectedDescription}
+        />
+      )}
     </Card>
   )
 }

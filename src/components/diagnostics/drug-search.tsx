@@ -38,16 +38,19 @@ export function DrugSearch({ selectedDrugs, onDrugsChange }: DrugSearchProps) {
   const [searchResults, setSearchResults] = useState<Drug[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [showResults, setShowResults] = useState(false)
+  const [noResultsFound, setNoResultsFound] = useState(false)
 
   // Debounce search
   const searchDrugs = useCallback(async (query: string) => {
     if (!query || query.length < 2) {
       setSearchResults([])
       setShowResults(false)
+      setNoResultsFound(false)
       return
     }
 
     setIsSearching(true)
+    setNoResultsFound(false)
     try {
       // Using openFDA API - free and no authentication required
       const response = await fetch(
@@ -62,22 +65,17 @@ export function DrugSearch({ selectedDrugs, onDrugsChange }: DrugSearchProps) {
       const results = data.results || []
       
       if (results.length === 0) {
-        // Fallback: create a simple drug entry from the search query
-        setSearchResults([{
-          generic_name: query,
-          brand_name: query,
-        }])
+        setSearchResults([])
+        setNoResultsFound(true)
       } else {
         setSearchResults(results)
+        setNoResultsFound(false)
       }
       setShowResults(true)
     } catch (error) {
       console.error('Error searching drugs:', error)
-      // Fallback: create a simple drug entry from the search query
-      setSearchResults([{
-        generic_name: query,
-        brand_name: query,
-      }])
+      setSearchResults([])
+      setNoResultsFound(true)
       setShowResults(true)
     } finally {
       setIsSearching(false)
@@ -125,55 +123,80 @@ export function DrugSearch({ selectedDrugs, onDrugsChange }: DrugSearchProps) {
       <div className="space-y-2">
         <label className="text-sm font-medium">Search and Add Medications</label>
         <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground z-10" />
           <Input
-            type="search"
+            type="text"
             placeholder="Search for medications (e.g., Aspirin, Ibuprofen)..."
-            className="pl-8"
+            className="pl-8 pr-8"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => searchQuery && setShowResults(true)}
             onBlur={() => setTimeout(() => setShowResults(false), 200)}
           />
-          {isSearching && (
-            <Loader2 className="absolute right-2.5 top-2.5 h-4 w-4 animate-spin text-muted-foreground" />
-          )}
+          <div className="absolute right-2.5 top-2.5">
+            {isSearching ? (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            ) : searchQuery ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-4 w-4 p-0 hover:bg-transparent"
+                onClick={() => {
+                  setSearchQuery('')
+                  setShowResults(false)
+                  setSearchResults([])
+                  setNoResultsFound(false)
+                }}
+              >
+                <X className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            ) : null}
+          </div>
           
           {/* Search Results Dropdown */}
-          {showResults && searchResults.length > 0 && (
+          {showResults && !isSearching && (
             <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
               <div className="p-2">
-                {searchResults.map((drug, index) => {
-                  const name = drug.brand_name || drug.generic_name || 'Unknown'
-                  return (
-                    <button
-                      key={index}
-                      type="button"
-                      className="w-full text-left p-2 hover:bg-accent rounded-md transition-colors"
-                      onMouseDown={(e) => {
-                        e.preventDefault()
-                        handleSelectDrug(drug)
-                      }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Pill className="h-4 w-4 text-primary" />
-                        <div className="flex-1">
-                          <div className="font-medium">{name}</div>
-                          {drug.generic_name && drug.brand_name && (
-                            <div className="text-xs text-muted-foreground">
-                              Generic: {drug.generic_name}
-                            </div>
-                          )}
-                          {drug.dosage_form && (
-                            <div className="text-xs text-muted-foreground">
-                              Form: {drug.dosage_form}
-                            </div>
-                          )}
+                {noResultsFound ? (
+                  <div className="text-center py-4 text-sm text-muted-foreground">
+                    <Pill className="h-5 w-5 mx-auto mb-2 opacity-50" />
+                    <p>Drug not found</p>
+                    <p className="text-xs mt-1">Try searching with a different name</p>
+                  </div>
+                ) : searchResults.length > 0 ? (
+                  searchResults.map((drug, index) => {
+                    const name = drug.brand_name || drug.generic_name || 'Unknown'
+                    return (
+                      <button
+                        key={index}
+                        type="button"
+                        className="w-full text-left p-2 hover:bg-accent rounded-md transition-colors"
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          handleSelectDrug(drug)
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Pill className="h-4 w-4 text-primary" />
+                          <div className="flex-1">
+                            <div className="font-medium">{name}</div>
+                            {drug.generic_name && drug.brand_name && (
+                              <div className="text-xs text-muted-foreground">
+                                Generic: {drug.generic_name}
+                              </div>
+                            )}
+                            {drug.dosage_form && (
+                              <div className="text-xs text-muted-foreground">
+                                Form: {drug.dosage_form}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </button>
-                  )
-                })}
+                      </button>
+                    )
+                  })
+                ) : null}
               </div>
             </div>
           )}

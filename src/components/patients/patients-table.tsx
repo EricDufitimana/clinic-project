@@ -1,10 +1,14 @@
 "use client"
 
 import React, { useEffect, useState } from 'react'
-import { Search, MoreVertical, History } from 'lucide-react'
+import { Search, MoreVertical, History, Eye, Edit, Trash2 } from 'lucide-react'
 import { PatientHistoryDialog } from '@/components/patients/patient-history-dialog'
+import { ViewPatientDialog } from '@/components/patients/view-patient-dialog'
+import { EditPatientDialog } from '@/components/patients/edit-patient-dialog'
+import { DeletePatientDialog } from '@/components/patients/delete-patient-dialog'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { toast } from 'sonner'
 import {
   Card,
   CardContent,
@@ -27,6 +31,7 @@ import {
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 interface Patient {
   id: string
@@ -45,28 +50,64 @@ export function PatientsTable() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedPatient, setSelectedPatient] = useState<{ id: string; name: string } | null>(null)
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false)
+  const [viewPatient, setViewPatient] = useState<Patient | null>(null)
+  const [viewDialogOpen, setViewDialogOpen] = useState(false)
+  const [editPatient, setEditPatient] = useState<Patient | null>(null)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [deletePatient, setDeletePatient] = useState<{ id: string; name: string } | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+
+  const fetchPatients = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch('/api/patients')
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch patients')
+      }
+
+      const data = await response.json()
+      setPatients(data.patients || [])
+    } catch (error) {
+      console.error('Error fetching patients:', error)
+      toast.error('Failed to load patients')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    async function fetchPatients() {
-      try {
-        setLoading(true)
-        const response = await fetch('/api/patients')
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch patients')
-        }
-
-        const data = await response.json()
-        setPatients(data.patients || [])
-      } catch (error) {
-        console.error('Error fetching patients:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
     fetchPatients()
   }, [])
+
+  const handleViewDetails = async (patient: Patient) => {
+    try {
+      const response = await fetch(`/api/patients/${patient.id}`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch patient details')
+      }
+      const data = await response.json()
+      setViewPatient(data.patient)
+      setViewDialogOpen(true)
+    } catch (error) {
+      console.error('Error fetching patient details:', error)
+      toast.error('Failed to load patient details')
+    }
+  }
+
+  const handleEdit = (patient: Patient) => {
+    setEditPatient(patient)
+    setEditDialogOpen(true)
+  }
+
+  const handleDelete = (patient: Patient) => {
+    setDeletePatient({ id: patient.id, name: patient.full_name })
+    setDeleteDialogOpen(true)
+  }
+
+  const handleSuccess = () => {
+    fetchPatients()
+  }
 
   const filteredPatients = patients.filter(patient =>
     patient.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -116,14 +157,15 @@ export function PatientsTable() {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="overflow-x-auto">
+      <CardContent>
         {filteredPatients.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             {searchQuery ? 'No patients found matching your search.' : 'No patients registered yet.'}
           </div>
         ) : (
-          <div className="min-w-full overflow-x-auto">
-            <Table>
+          <ScrollArea className="w-full">
+            <div className="min-w-full">
+              <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead className="min-w-[200px]">Patient</TableHead>
@@ -182,9 +224,21 @@ export function PatientsTable() {
                             <History className="h-4 w-4 mr-2" />
                             View History
                           </DropdownMenuItem>
-                          <DropdownMenuItem>View Details</DropdownMenuItem>
-                          <DropdownMenuItem>Edit Patient</DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">Delete Patient</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleViewDetails(patient)}>
+                            <Eye className="h-4 w-4 mr-2" />
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEdit(patient)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit Patient
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-red-600"
+                            onClick={() => handleDelete(patient)}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete Patient
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -192,7 +246,8 @@ export function PatientsTable() {
                 ))}
               </TableBody>
             </Table>
-          </div>
+            </div>
+          </ScrollArea>
         )}
       </CardContent>
 
@@ -202,6 +257,32 @@ export function PatientsTable() {
           onOpenChange={setHistoryDialogOpen}
           patientId={selectedPatient.id}
           patientName={selectedPatient.name}
+        />
+      )}
+
+      {viewPatient && (
+        <ViewPatientDialog
+          open={viewDialogOpen}
+          onOpenChange={setViewDialogOpen}
+          patient={viewPatient}
+        />
+      )}
+
+      {editPatient && (
+        <EditPatientDialog
+          open={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          patient={editPatient}
+          onSuccess={handleSuccess}
+        />
+      )}
+
+      {deletePatient && (
+        <DeletePatientDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          patient={deletePatient}
+          onSuccess={handleSuccess}
         />
       )}
     </Card>

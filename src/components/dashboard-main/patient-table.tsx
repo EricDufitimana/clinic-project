@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState } from 'react'
-import { Search, MoreVertical } from 'lucide-react'
+import { Search, MoreVertical, Eye, History } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -26,6 +26,10 @@ import {
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { ViewPatientDialog } from '@/components/patients/view-patient-dialog'
+import { PatientHistoryDialog } from '@/components/patients/patient-history-dialog'
+import { useRouter } from 'next/navigation'
 
 interface Patient {
   id: string
@@ -33,16 +37,19 @@ interface Patient {
   age: number
   gender: string
   contact: string | null
-  status: string
-  condition: string
-  last_visit: string
-  next_appointment: string | null
+  address: string | null
+  created_at: string
 }
 
 export function PatientTable() {
+  const router = useRouter()
   const [patients, setPatients] = useState<Patient[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [viewPatient, setViewPatient] = useState<Patient | null>(null)
+  const [viewDialogOpen, setViewDialogOpen] = useState(false)
+  const [selectedPatient, setSelectedPatient] = useState<{ id: string; name: string } | null>(null)
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false)
 
   useEffect(() => {
     async function fetchPatients() {
@@ -55,7 +62,7 @@ export function PatientTable() {
         }
 
         const data = await response.json()
-        // Get recent patients (last 5)
+        // Get recent patients (last 5, ordered by created_at desc)
         const recentPatients = (data.patients || []).slice(0, 5)
         setPatients(recentPatients)
       } catch (error) {
@@ -70,7 +77,8 @@ export function PatientTable() {
 
   const filteredPatients = patients.filter(patient =>
     patient.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    patient.contact?.toLowerCase().includes(searchQuery.toLowerCase())
+    patient.contact?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    patient.address?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   const formatDate = (dateString: string) => {
@@ -81,21 +89,14 @@ export function PatientTable() {
     })
   }
 
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    })
+  const handleViewDetails = async (patient: Patient) => {
+    setViewPatient(patient)
+    setViewDialogOpen(true)
   }
 
-  const isAppointmentSoon = (appointmentDate: string | null) => {
-    if (!appointmentDate) return false
-    const appointment = new Date(appointmentDate)
-    const today = new Date()
-    const diffTime = appointment.getTime() - today.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays >= 0 && diffDays <= 7
+  const handleViewHistory = (patient: Patient) => {
+    setSelectedPatient({ id: patient.id, name: patient.full_name })
+    setHistoryDialogOpen(true)
   }
 
   if (loading) {
@@ -116,104 +117,123 @@ export function PatientTable() {
   }
 
   return (
-    <Card className="mt-6 shadow-none">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-xl font-semibold">Recent Patients</CardTitle>
-          <div className="relative w-72">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search patients..."
-              className="pl-8"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+    <>
+      <Card className="mt-6 shadow-none">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xl font-semibold">Recent Patients</CardTitle>
+            <div className="relative w-72">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search patients..."
+                className="pl-8"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
           </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Patient</TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Condition</TableHead>
-              <TableHead>Last Visit</TableHead>
-              <TableHead>Next Appointment</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredPatients.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                  {searchQuery ? 'No patients found matching your search.' : 'No patients registered yet.'}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredPatients.map((patient) => (
-                <TableRow key={patient.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{patient.full_name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {patient.id.slice(0, 8)} • {patient.age}y • {patient.gender}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      {patient.contact ? (
-                        <div>{patient.contact}</div>
-                      ) : (
-                        <div className="text-muted-foreground">No contact</div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant={patient.status === 'ACTIVE' ? 'default' : 'secondary'}
-                      className={patient.status === 'ACTIVE' ? 'border-green-200 text-green-800 bg-green-100 hover:border-green-200 hover:text-green-800 hover:bg-green-100' : 'border-gray-200 text-gray-800 bg-gray-100 hover:border-gray-200 hover:text-gray-800 hover:bg-gray-100'}
-                    >
-                      {patient.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm">{patient.condition || 'N/A'}</TableCell>
-                  <TableCell className="text-sm">{formatDate(patient.last_visit)}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <div className="text-sm">
-                        {patient.next_appointment ? formatDateTime(patient.next_appointment) : 'None scheduled'}
-                      </div>
-                      {patient.next_appointment && isAppointmentSoon(patient.next_appointment) && (
-                        <Badge variant="outline" className="w-fit text-xs">Soon</Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>View Details</DropdownMenuItem>
-                        <DropdownMenuItem>Edit Patient</DropdownMenuItem>
-                        <DropdownMenuItem>Schedule Appointment</DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-600">Delete Patient</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+        </CardHeader>
+        <CardContent>
+          {filteredPatients.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              {searchQuery ? 'No patients found matching your search.' : 'No patients registered yet.'}
+            </div>
+          ) : (
+            <ScrollArea className="w-full">
+              <div className="min-w-full">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[200px]">Patient</TableHead>
+                      <TableHead className="min-w-[150px]">Contact</TableHead>
+                      <TableHead className="min-w-[200px]">Address</TableHead>
+                      <TableHead className="min-w-[120px]">Registered</TableHead>
+                      <TableHead className="text-right min-w-[100px]">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredPatients.map((patient) => (
+                      <TableRow key={patient.id}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{patient.full_name}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {patient.age}y • {patient.gender}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {patient.contact ? (
+                              <div>{patient.contact}</div>
+                            ) : (
+                              <div className="text-muted-foreground">No contact</div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm max-w-[250px]">
+                            {patient.address ? (
+                              <div className="truncate" title={patient.address}>
+                                {patient.address}
+                              </div>
+                            ) : (
+                              <div className="text-muted-foreground">No address</div>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {formatDate(patient.created_at)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleViewDetails(patient)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleViewHistory(patient)}>
+                                <History className="h-4 w-4 mr-2" />
+                                View History
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => router.push('/dashboard/patients')}>
+                                Manage Patients
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </ScrollArea>
+          )}
+        </CardContent>
+      </Card>
+
+      {viewPatient && (
+        <ViewPatientDialog
+          open={viewDialogOpen}
+          onOpenChange={setViewDialogOpen}
+          patient={viewPatient}
+        />
+      )}
+
+      {selectedPatient && (
+        <PatientHistoryDialog
+          open={historyDialogOpen}
+          onOpenChange={setHistoryDialogOpen}
+          patientId={selectedPatient.id}
+          patientName={selectedPatient.name}
+        />
+      )}
+    </>
   )
 }
-

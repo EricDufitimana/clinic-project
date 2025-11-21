@@ -1,6 +1,6 @@
 "use client"
 
-import DashboardLayout from "@/components/other/DashboardLayout"
+import { useEffect, useState } from "react"
 import { MedicalDescriptionsTable } from "@/components/diagnostics/medical-descriptions-table"
 import { CreateDiagnosticDialog } from "@/components/diagnostics/create-diagnostic-dialog"
 import { FileText, Clock, AlertCircle } from "lucide-react"
@@ -9,12 +9,18 @@ import { Badge } from "@/components/ui/badge"
 import { useUser } from "@/hooks/use-user"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+
+interface DiagnosticsStats {
+  totalRecords: number
+  thisWeek: number
+}
 
 export default function DiagnosticsPage() {
   const { user, loading } = useUser()
   const router = useRouter()
+  const [stats, setStats] = useState<DiagnosticsStats | null>(null)
+  const [statsLoading, setStatsLoading] = useState(true)
 
   useEffect(() => {
     if (!loading && user?.role !== 'doctor') {
@@ -22,36 +28,57 @@ export default function DiagnosticsPage() {
     }
   }, [user, loading, router])
 
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (user?.role !== 'doctor') return
+      
+      try {
+        setStatsLoading(true)
+        const response = await fetch('/api/medical-descriptions/stats')
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch stats')
+        }
+
+        const data = await response.json()
+        setStats(data.stats)
+      } catch (error) {
+        console.error('Error fetching diagnostics stats:', error)
+      } finally {
+        setStatsLoading(false)
+      }
+    }
+
+    if (!loading && user?.role === 'doctor') {
+      fetchStats()
+    }
+  }, [user, loading])
+
   if (loading) {
     return (
-      <DashboardLayout>
-        <div className="w-full max-w-full">
-          <Skeleton className="h-8 w-64 mb-4" />
-          <Skeleton className="h-4 w-80 mb-6" />
-        </div>
-      </DashboardLayout>
+      <div className="w-full max-w-full">
+        <Skeleton className="h-8 w-64 mb-4" />
+        <Skeleton className="h-4 w-80 mb-6" />
+      </div>
     )
   }
 
   if (user?.role !== 'doctor') {
     return (
-      <DashboardLayout>
-        <div className="w-full max-w-full">
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Access Denied</AlertTitle>
-            <AlertDescription>
-              This page is only available to doctors. You will be redirected to the dashboard.
-            </AlertDescription>
-          </Alert>
-        </div>
-      </DashboardLayout>
+      <div className="w-full max-w-full">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Access Denied</AlertTitle>
+          <AlertDescription>
+            This page is only available to doctors. You will be redirected to the dashboard.
+          </AlertDescription>
+        </Alert>
+      </div>
     )
   }
 
   return (
-    <DashboardLayout>
-      <div className="w-full max-w-full">
+    <div className="w-full max-w-full">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold">
@@ -70,9 +97,12 @@ export default function DiagnosticsPage() {
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <FileText className="h-4 w-4 text-muted-foreground" />
-                <Badge variant="secondary" className="text-xs">+12%</Badge>
               </div>
-              <CardTitle className="text-2xl font-bold">45</CardTitle>
+              {statsLoading ? (
+                <Skeleton className="h-8 w-16 mb-2" />
+              ) : (
+                <CardTitle className="text-2xl font-bold">{stats?.totalRecords || 0}</CardTitle>
+              )}
               <p className="text-xs text-muted-foreground">Total Records</p>
             </CardHeader>
           </Card>
@@ -80,16 +110,21 @@ export default function DiagnosticsPage() {
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <Clock className="h-4 w-4 text-muted-foreground" />
-                <Badge variant="secondary" className="text-xs">8</Badge>
+                {!statsLoading && stats && (
+                  <Badge variant="secondary" className="text-xs">{stats.thisWeek}</Badge>
+                )}
               </div>
-              <CardTitle className="text-2xl font-bold">This Week</CardTitle>
-              <p className="text-xs text-muted-foreground">New Records</p>
+              {statsLoading ? (
+                <Skeleton className="h-8 w-16 mb-2" />
+              ) : (
+                <CardTitle className="text-2xl font-bold">{stats?.thisWeek || 0}</CardTitle>
+              )}
+              <p className="text-xs text-muted-foreground">This Week</p>
             </CardHeader>
           </Card>
         </div>
 
         <MedicalDescriptionsTable />
       </div>
-    </DashboardLayout>
   )
 }
