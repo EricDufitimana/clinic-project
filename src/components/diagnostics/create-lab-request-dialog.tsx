@@ -31,11 +31,11 @@ interface Doctor {
 
 export function CreateLabRequestDialog() {
   const [open, setOpen] = useState(false)
-  const [patients, setPatients] = useState<Patient[]>([])
+  const [appointments, setAppointments] = useState<any[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
-  const [loadingPatients, setLoadingPatients] = useState(false)
+  const [loadingAppointments, setLoadingAppointments] = useState(false)
   const [loadingDoctors, setLoadingDoctors] = useState(false)
-  const [patientId, setPatientId] = useState('')
+  const [appointmentId, setAppointmentId] = useState('')
   const [doctorId, setDoctorId] = useState('')
   const [testType, setTestType] = useState('')
   const [reason, setReason] = useState('')
@@ -43,23 +43,23 @@ export function CreateLabRequestDialog() {
 
   useEffect(() => {
     if (open) {
-      fetchPatients()
+      fetchAppointments()
       fetchDoctors()
     }
   }, [open])
 
-  const fetchPatients = async () => {
+  const fetchAppointments = async () => {
     try {
-      setLoadingPatients(true)
-      const response = await fetch('/api/patients')
-      if (!response.ok) throw new Error('Failed to fetch patients')
+      setLoadingAppointments(true)
+      const response = await fetch('/api/appointments')
+      if (!response.ok) throw new Error('Failed to fetch appointments')
       const data = await response.json()
-      setPatients(data.patients || [])
+      setAppointments(data.appointments || [])
     } catch (error) {
-      console.error('Error fetching patients:', error)
-      toast.error('Failed to load patients')
+      console.error('Error fetching appointments:', error)
+      toast.error('Failed to load appointments')
     } finally {
-      setLoadingPatients(false)
+      setLoadingAppointments(false)
     }
   }
 
@@ -81,7 +81,7 @@ export function CreateLabRequestDialog() {
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     
-    if (!patientId || !testType || !doctorId) {
+    if (!appointmentId || !testType || !doctorId) {
       toast.error('Please fill in all required fields')
       return
     }
@@ -94,8 +94,7 @@ export function CreateLabRequestDialog() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          patient_id: patientId,
-          doctor_id: doctorId,
+          appointment_id: appointmentId,
           test_type: testType,
           reason: reason || null,
         }),
@@ -105,7 +104,7 @@ export function CreateLabRequestDialog() {
 
       if (response.ok) {
         toast.success('Lab request sent to doctor successfully!')
-        setPatientId('')
+        setAppointmentId('')
         setDoctorId('')
         setTestType('')
         setReason('')
@@ -140,15 +139,15 @@ export function CreateLabRequestDialog() {
         <form onSubmit={handleCreate}>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="patient">Patient *</Label>
-              <Select value={patientId} onValueChange={setPatientId} required>
-                <SelectTrigger id="patient">
-                  <SelectValue placeholder={loadingPatients ? "Loading patients..." : "Select patient"} />
+              <Label htmlFor="appointment">Appointment *</Label>
+              <Select value={appointmentId} onValueChange={setAppointmentId} required>
+                <SelectTrigger id="appointment">
+                  <SelectValue placeholder={loadingAppointments ? "Loading appointments..." : "Select appointment"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {patients.map((patient) => (
-                    <SelectItem key={patient.id} value={patient.id}>
-                      {patient.full_name}
+                  {appointments.map((appointment: any) => (
+                    <SelectItem key={appointment.id} value={appointment.id}>
+                      {appointment.patient?.full_name || 'Unknown Patient'} - {new Date(appointment.created_at).toLocaleDateString()}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { LayoutDashboard, UserPlus, Stethoscope, User, EllipsisVertical, LogOut, TestTube2 } from "lucide-react"
+import { LayoutDashboard, UserPlus, Stethoscope, User, EllipsisVertical, LogOut, TestTube2, Calendar } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { VersionSwitcher } from "@/components/version-switcher"
@@ -40,6 +40,11 @@ const navMain = [
     title: "Patients",
     url: "/dashboard/patients",
     icon: UserPlus,
+  },
+  {
+    title: "Appointments",
+    url: "/dashboard/appointments",
+    icon: Calendar,
   },
   {
     title: "Lab Requests",

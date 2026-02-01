@@ -34,6 +34,7 @@ export default function LabRequestsPage() {
         }
 
         const data = await response.json()
+        console.log("Data Received: ", data.stats)  
         setStats(data.stats)
       } catch (error) {
         console.error('Error fetching lab request stats:', error)

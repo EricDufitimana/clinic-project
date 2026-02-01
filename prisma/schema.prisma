@@ -12,16 +12,23 @@ datasource db {
 }
 
 model User {
-  id         String   @id @default(uuid())
-  user_id    String   @unique // Supabase Auth user ID
+  id         String    @id @default(uuid())
+  user_id    String    @unique // Supabase Auth user ID
   email      String
   first_name String
   last_name  String
-  role       UserRole
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
+  role       UserRole?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
 
-  // medicalDescriptions MedicalDescription[] // Not used - using Supabase client
+  // Relations
+  medicalDescriptions MedicalDescription[]
+  labRequestsAsNurse  LabRequest[]         @relation("LabRequestNurse")
+  labRequestsAsDoctor LabRequest[]         @relation("LabRequestDoctor")
+  doctorReports       DoctorReport[]
+  registeredPatients  Patient[]            @relation("PatientRegistration")
+  appointments        Appointment[]        @relation("AppointmentDoctor")
+  referredAppointments Appointment[]        @relation("ReferredDoctor")
 
   @@index([user_id])
   @@index([email])
@@ -29,19 +36,92 @@ model User {
 }
 
 model Patient {
-  id              String        @id @default(cuid())
-  name            String
-  contact         String        @unique
-  status          PatientStatus @default(ACTIVE)
-  condition       String
-  lastVisit       DateTime      @map("last_visit")
-  nextAppointment DateTime?     @map("next_appointment")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  id            String   @id @default(uuid())
+  full_name     String
+  age           Int
+  gender        String
+  address       String?
+  contact       String?
+  registered_by String
+  created_at    DateTime @default(now())
 
-  // medicalDescriptions MedicalDescription[] // Not used - using Supabase client
+  // Relations
+  appointments Appointment[]
+  registeredBy User          @relation("PatientRegistration", fields: [registered_by], references: [id])
 
   @@map("patients")
+}
+
+model Appointment {
+  id               BigInt            @id @default(autoincrement())
+  patient_id       String
+  doctor_id        String?
+  created_at       DateTime          @default(now())
+  status           AppointmentStatus @default(PENDING)
+  is_referred      Boolean           @default(false)
+  is_lab_requested Boolean           @default(false)
+  referred_doctor_id String?
+
+  // Relations
+  patient             Patient              @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+  doctor              User?                 @relation("AppointmentDoctor", fields: [doctor_id], references: [id], onDelete: Cascade)
+  medicalDescriptions MedicalDescription[]
+  labRequests         LabRequest[]
+  doctorReports       DoctorReport[]
+  referredDoctor      User?                 @relation("ReferredDoctor", fields: [referred_doctor_id], references: [id], onDelete: Cascade)
+
+  @@map("appointments")
+}
+
+model MedicalDescription {
+  id             String   @id @default(uuid())
+  doctor_id      String
+  description    String
+  created_at     DateTime @default(now())
+  prescriptions  Json?
+  notes          String?
+  appointment_id BigInt
+
+  // Relations
+  doctor      User        @relation(fields: [doctor_id], references: [id], onDelete: Cascade)
+  appointment Appointment @relation(fields: [appointment_id], references: [id], onDelete: Cascade)
+
+  @@map("medical_descriptions")
+}
+
+model LabRequest {
+  id             String           @id @default(uuid())
+  nurse_id       String
+  test_type      String
+  reason         String?
+  status         LabRequestStatus @default(PENDING)
+  result         String?
+  created_at     DateTime         @default(now())
+  doctor_id      String?
+  appointment_id BigInt?
+
+  // Relations
+  nurse       User         @relation("LabRequestNurse", fields: [nurse_id], references: [id], onDelete: Cascade)
+  doctor      User?        @relation("LabRequestDoctor", fields: [doctor_id], references: [id], onDelete: Cascade)
+  appointment Appointment? @relation(fields: [appointment_id], references: [id], onDelete: Cascade)
+
+  @@map("lab_requests")
+}
+
+model DoctorReport {
+  id             String   @id @default(uuid())
+  doctor_id      String
+  diagnosis      String
+  prescription   String
+  notes          String?
+  created_at     DateTime @default(now())
+  appointment_id BigInt
+
+  // Relations
+  doctor      User        @relation(fields: [doctor_id], references: [id], onDelete: Cascade)
+  appointment Appointment @relation(fields: [appointment_id], references: [id], onDelete: Cascade)
+
+  @@map("doctor_reports")
 }
 
 enum UserRole {
@@ -49,29 +129,12 @@ enum UserRole {
   nurse
 }
 
-enum PatientStatus {
-  ACTIVE
-  INACTIVE
-  CRITICAL
+enum AppointmentStatus {
+  PENDING
+  DIAGNOSED
 }
 
-// Note: MedicalDescription model is not used - we use Supabase client directly
-// The table is created via SQL migration: create_medical_descriptions_table.sql
-// 
-// model MedicalDescription {
-//   id          String   @id @default(cuid())
-//   patient_id  String
-//   doctor_id  String
-//   description String
-//   diagnosis   String?
-//   notes       String?
-//   created_at  DateTime @default(now()) @map("created_at")
-//   updated_at  DateTime @updatedAt @map("updated_at")
-//
-//   patient Patient @relation(fields: [patient_id], references: [id], onDelete: Cascade)
-//   doctor  User    @relation(fields: [doctor_id], references: [id], onDelete: Cascade)
-//
-//   @@index([patient_id])
-//   @@index([doctor_id])
-//   @@map("medical_descriptions")
-// }
+enum LabRequestStatus {
+  PENDING
+  COMPLETED
+}

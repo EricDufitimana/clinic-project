@@ -56,40 +56,22 @@ export async function GET() {
     }
 
     // Get completed lab requests today
-    // Check for requests that were completed today (status = completed and updated_at is today)
+    // Check for requests that were completed today (status = completed and created_at is today)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const todayISO = today.toISOString()
     const tomorrowISO = new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString()
 
-    // First, try to get completed requests that were updated today
-    const { data: completedTodayData, error: completedTodayError } = await supabase
+    // Get completed requests that were created today
+    const { count: completedToday, error: completedTodayError } = await supabase
       .from('lab_requests')
-      .select('id, status, updated_at')
+      .select('*', { count: 'exact', head: true })
       .eq('status', 'completed')
-      .gte('updated_at', todayISO)
-      .lt('updated_at', tomorrowISO)
+      .gte('created_at', todayISO)
+      .lt('created_at', tomorrowISO)
 
     if (completedTodayError) {
       console.error('Error fetching completed lab requests today:', completedTodayError)
-    }
-
-    // If no updated_at field or it doesn't work, fallback to checking created_at for completed requests
-    // This is a fallback in case updated_at doesn't exist or isn't reliable
-    let completedToday = completedTodayData?.length || 0
-    
-    // If we got 0 from updated_at, try created_at as fallback
-    if (completedToday === 0) {
-      const { count: completedTodayCount, error: completedTodayFallbackError } = await supabase
-        .from('lab_requests')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'completed')
-        .gte('created_at', todayISO)
-        .lt('created_at', tomorrowISO)
-
-      if (!completedTodayFallbackError && completedTodayCount) {
-        completedToday = completedTodayCount
-      }
     }
 
     // Calculate completion rate percentage
@@ -104,21 +86,26 @@ export async function GET() {
     const yesterdayISO = yesterday.toISOString()
     const dayBeforeISO = new Date(yesterday.getTime() - 24 * 60 * 60 * 1000).toISOString()
 
-    const { data: completedYesterdayData, error: yesterdayError } = await supabase
+    const { count: completedYesterday, error: yesterdayError } = await supabase
       .from('lab_requests')
-      .select('id, status, updated_at')
+      .select('*', { count: 'exact', head: true })
       .eq('status', 'completed')
-      .gte('updated_at', yesterdayISO)
-      .lt('updated_at', todayISO)
+      .gte('created_at', yesterdayISO)
+      .lt('created_at', todayISO)
 
-    const completedYesterday = completedYesterdayData?.length || 0
+    if (yesterdayError) {
+      console.error('Error fetching completed lab requests yesterday:', yesterdayError)
+    }
 
     // Calculate percentage change
     let completedTodayChange = '0%'
-    if (completedYesterday > 0) {
-      const change = ((completedToday - completedYesterday) / completedYesterday) * 100
+    const todayCount = completedToday || 0
+    const yesterdayCount = completedYesterday || 0
+    
+    if (yesterdayCount > 0) {
+      const change = ((todayCount - yesterdayCount) / yesterdayCount) * 100
       completedTodayChange = change > 0 ? `+${Math.round(change)}%` : `${Math.round(change)}%`
-    } else if (completedToday > 0) {
+    } else if (todayCount > 0) {
       completedTodayChange = '+100%'
     }
 
@@ -126,7 +113,7 @@ export async function GET() {
       totalRequests: totalRequests || 0,
       completed: completed || 0,
       pending: pending || 0,
-      completedToday: completedToday,
+      completedToday: completedToday || 0,
       completionRate: completionRate,
       completedTodayChange: completedTodayChange,
     }

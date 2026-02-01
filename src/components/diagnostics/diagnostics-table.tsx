@@ -84,6 +84,7 @@ export function DiagnosticsTable() {
       }
 
       const data = await response.json()
+      console.log("Table Lab Requests: ", data.labRequests)
       setLabRequests(data.labRequests || [])
     } catch (error) {
       console.error('Error fetching lab requests:', error)

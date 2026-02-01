@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/utils/supabase/service-role'
 import { getAuthenticatedUser } from '@/utils/auth/get-authenticated-user'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    console.log('📋 GET /api/medical-descriptions - Fetching medical descriptions started');
+    console.log('📋 GET /api/doctor-reports - Fetching doctor reports started');
     
     // Get authenticated user
     const result = await getAuthenticatedUser('id, role', true)
@@ -19,27 +19,22 @@ export async function GET(request: NextRequest) {
 
     const { authUser, userData } = result
 
-    // Only doctors and nurses can view medical descriptions
-    if (userData.role !== 'doctor' && userData.role !== 'nurse') {
+    // Only doctors can view doctor reports
+    if (userData.role !== 'doctor') {
       return NextResponse.json(
         { error: 'Forbidden' },
         { status: 403 }
       )
     }
 
-    // Get query parameters
-    const { searchParams } = new URL(request.url)
-    const appointmentId = searchParams.get('appointment_id')
-    console.log('🔍 Query parameters:', { appointmentId });
-
-    // Fetch medical descriptions with related patient, doctor, and appointment data
+    // Fetch doctor reports with related patient, doctor, and appointment data
     const supabase = createServiceRoleClient()
     
-    let query = supabase
-      .from('medical_descriptions')
+    const { data: doctorReports, error: fetchError } = await supabase
+      .from('doctor_reports')
       .select(`
         *,
-        appointment:appointments!medical_descriptions_appointment_id_fkey (
+        appointment:appointments!doctor_reports_appointment_id_fkey (
           id,
           created_at,
           status,
@@ -53,33 +48,25 @@ export async function GET(request: NextRequest) {
             gender
           )
         ),
-        doctor:users!medical_descriptions_doctor_id_fkey (
+        doctor:users!doctor_reports_doctor_id_fkey (
           id,
           first_name,
           last_name
         )
       `)
-
-    // Apply appointment_id filter if provided
-    if (appointmentId) {
-      console.log('🎯 Applying appointment_id filter:', appointmentId);
-      query = query.eq('appointment_id', parseInt(appointmentId))
-    }
-
-    const { data: medicalDescriptions, error: fetchError } = await query
       .order('created_at', { ascending: false })
 
     if (fetchError) {
-      console.error('❌ Error fetching medical descriptions:', fetchError);
+      console.error('❌ Error fetching doctor reports:', fetchError);
       return NextResponse.json(
-        { error: 'Failed to fetch medical descriptions' },
+        { error: 'Failed to fetch doctor reports' },
         { status: 500 }
       )
     }
 
-    return NextResponse.json({ medicalDescriptions }, { status: 200 })
+    return NextResponse.json({ doctorReports }, { status: 200 })
   } catch (error) {
-    console.error('💥 Unexpected error in GET /api/medical-descriptions:', error);
+    console.error('💥 Unexpected error in GET /api/doctor-reports:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -89,7 +76,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('🆕 POST /api/medical-descriptions - Medical description creation started');
+    console.log('🆕 POST /api/doctor-reports - Doctor report creation started');
     
     // Get authenticated user
     const result = await getAuthenticatedUser('id, role', true)
@@ -104,20 +91,20 @@ export async function POST(request: NextRequest) {
     const { authUser, userData } = result
 
     const data = await request.json()
-    const { appointment_id, description, notes, prescriptions } = data
+    const { appointment_id, diagnosis, prescription, notes } = data
 
     // Validate required fields
-    if (!appointment_id || !description) {
+    if (!appointment_id || !diagnosis) {
       return NextResponse.json(
-        { error: 'Missing required fields: appointment_id, description' },
+        { error: 'Missing required fields: appointment_id, diagnosis' },
         { status: 400 }
       )
     }
 
-    // Only doctors and nurses can create medical descriptions
-    if (userData.role !== 'doctor' && userData.role !== 'nurse') {
+    // Only doctors can create doctor reports
+    if (userData.role !== 'doctor') {
       return NextResponse.json(
-        { error: 'Only doctors and nurses can create medical descriptions' },
+        { error: 'Only doctors can create doctor reports' },
         { status: 403 }
       )
     }
@@ -137,22 +124,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Insert medical description linked to appointment
-    const medicalDescriptionData = {
+    // Insert doctor report linked to appointment
+    const doctorReportData = {
       appointment_id: parseInt(appointment_id),
       doctor_id: userData.id,
-      description,
+      diagnosis,
+      prescription,
       notes: notes || null,
-      prescriptions: prescriptions && prescriptions.length > 0 ? prescriptions : null,
     };
 
-    const supabaseServiceRole = createServiceRoleClient()
-    const { data: medicalDescription, error: insertError } = await supabaseServiceRole
-      .from('medical_descriptions')
-      .insert(medicalDescriptionData)
+    const { data: doctorReport, error: insertError } = await supabase
+      .from('doctor_reports')
+      .insert(doctorReportData)
       .select(`
         *,
-        appointment:appointments!medical_descriptions_appointment_id_fkey (
+        appointment:appointments!doctor_reports_appointment_id_fkey (
           id,
           created_at,
           status,
@@ -166,7 +152,7 @@ export async function POST(request: NextRequest) {
             gender
           )
         ),
-        doctor:users!medical_descriptions_doctor_id_fkey (
+        doctor:users!doctor_reports_doctor_id_fkey (
           id,
           first_name,
           last_name
@@ -175,25 +161,24 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (insertError) {
-      console.error('❌ Error inserting medical description:', insertError);
+      console.error('❌ Error inserting doctor report:', insertError);
       return NextResponse.json(
         { error: insertError.message },
         { status: 500 }
       )
     }
 
-    console.log('🎉 Medical description created successfully!');
+    console.log('🎉 Doctor report created successfully!');
 
     return NextResponse.json(
-      { message: 'Medical description created successfully', medicalDescription },
+      { message: 'Doctor report created successfully', doctorReport },
       { status: 201 }
     )
   } catch (error) {
-    console.error('💥 Unexpected error in POST /api/medical-descriptions:', error);
+    console.error('💥 Unexpected error in POST /api/doctor-reports:', error);
     return NextResponse.json(
-      { error: 'Failed to create medical description' },
+      { error: 'Failed to create doctor report' },
       { status: 500 }
     )
   }
 }
-

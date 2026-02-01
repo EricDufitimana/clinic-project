@@ -24,6 +24,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const getPageName = () => {
     if (pathname === '/dashboard') return 'Dashboard'
     if (pathname === '/dashboard/patients') return 'Patients'
+    if (pathname === '/dashboard/appointments') return 'Appointments'
     if (pathname === '/dashboard/lab-requests') return 'Lab Requests'
     if (pathname === '/dashboard/diagnostics') return 'Diagnostics'
     return 'Dashboard'
